@@ -1,564 +1,609 @@
+#include "App.hpp"
 #include "MainFrame.hpp"
-#include <wx/wx.h>
-#include <wx/listctrl.h>
-
-#include <sqlite3.h>
 #include "SQLiteDB.hpp"
+#include "Structs.hpp"
 
+#include <wx/wx.h>
 #include <iostream>
-#include <fstream>
 #include <iomanip>
-#include <vector>
-#include <algorithm>
-#include <cmath>
-
-using std::vector;
 
 SQLiteDB database = SQLiteDB("register.db");
 
 MainFrame::MainFrame(const wxString& title) : wxFrame(nullptr, wxID_ANY, title)
 {
-
-	this->SetSizeHints( wxSize( 1300,730 ), wxDefaultSize );
-	this->SetForegroundColour( wxSystemSettings::GetColour( wxSYS_COLOUR_WINDOW ) );
-	this->SetBackgroundColour( wxColour( 48, 48, 48 ) );
-
-	wxBoxSizer* sizerMain;	// enhält 3 Sizer
-	sizerMain = new wxBoxSizer( wxHORIZONTAL );
-
-	// -------------------------------------------------------------------------------
-	// Linker Abschnitt mit Tagesabschluss und Logout
-
-	wxBoxSizer* sizerLeft= new wxBoxSizer( wxVERTICAL );
-	sizerLeft->SetMinSize(wxSize(100, -1)); // Minimale Größe
-    //sizerLeft->SetMaxSize(wxSize(400, 400)); // Maximale Größe
+    this->SetBackgroundColour( wxColour( 64, 64, 64 ) );
 
 
-	wxPanel *m_panel1 = new wxPanel( this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL );
-	m_panel1->SetBackgroundColour( wxColour( 48, 48, 48 ) );
-	sizerLeft->Add( m_panel1, 1, wxEXPAND | wxALL, 5 );
+    wxBoxSizer* mainSizer = new wxBoxSizer( wxHORIZONTAL );
 
-	wxButton *buttonClosing = new wxButton( this, wxID_ANY, "A\nb\ns\nc\nh\nl\nu\ns\ns", wxDefaultPosition, wxDefaultSize, 0);
-	buttonClosing->SetMinSize(wxSize(20, 100));
-	buttonClosing->SetFont( wxFont( 20, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD, false, wxT("Sans") ) );
-	buttonClosing->SetForegroundColour( wxColour( 240, 240, 240 ) );
-	buttonClosing->SetBackgroundColour( wxColour( 52, 100, 235 ) );
+    /*************************LEFT SIZER****************************/
 
-	buttonClosing->Bind(wxEVT_BUTTON, &MainFrame::onButtonClosing, this);
+    wxBoxSizer* leftSizer = new wxBoxSizer( wxVERTICAL );
 
-	sizerLeft->Add( buttonClosing, 1, wxALL|wxEXPAND, 20 );
+    wxButton *closingButton = new wxButton( this, wxID_ANY, "C\nL\nO\nS\nI\nN\nG", wxDefaultPosition, wxDefaultSize, 0 );
+    closingButton->SetFont( wxFont( 14, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD, false, wxT("Sans") ) );
+    closingButton->SetBackgroundColour( wxColour( 160, 160, 160 ) );
+    closingButton->SetMinSize( wxSize( 20,20 ) );
+
+    closingButton->Bind(wxEVT_BUTTON, &MainFrame::onButtonClosing, this);
+
+    leftSizer->Add( closingButton, 3, wxALL|wxEXPAND, 5 );
+
+    mainSizer->Add( leftSizer, 1, wxALL|wxEXPAND, 20 );
+
+    /*************************MIDDLE SIZER****************************/
+
+    wxBoxSizer* middleSizer = new wxBoxSizer( wxVERTICAL );
+
+    wxBoxSizer* displaySizer = new wxBoxSizer( wxVERTICAL );
 
 
-	sizerMain->Add( sizerLeft, 1, wxEXPAND|wxTOP, 20 );
+    _accountNumber = database.getAccountNumber();
+    wxString accountNumber = wxString::Format("Rechnungsnummer: %d", _accountNumber);
 
-	/*********************************************************************************************************
-		sizerMiddle contains:
-		> the display for the choosen products, a display for the actual price to pay
-		> buttons to enter numbers
-		> a button to delete a product from the actual account and a button to close the bill and print it out
-	*/
+    displayNumber = new wxTextCtrl( this, wxID_ANY, accountNumber, wxDefaultPosition, wxDefaultSize, 0|wxBORDER_NONE );
+    displayNumber->SetFont( wxFont( 12, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD, false, wxT("Sans") ) );
+    displayNumber->SetForegroundColour( wxColour( 240, 240, 240 ) );
+    displayNumber->SetBackgroundColour( wxColour( 64, 64, 64 ) );
 
-	wxBoxSizer* sizerMiddle;
-	sizerMiddle = new wxBoxSizer( wxVERTICAL );
+    displaySizer->Add(displayNumber, 1, wxALL|wxEXPAND, 5 );
 
-	wxBoxSizer* sizerDisplays;
-	sizerDisplays = new wxBoxSizer( wxVERTICAL );
+    listView = new wxListView(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLC_REPORT | wxLC_SINGLE_SEL);
+    listView->SetFont( wxFont( 14, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, wxT("Sans") ) );
+    listView->InsertColumn(0, "Anzahl");
+    listView->InsertColumn(1, "Produkt");
+    listView->InsertColumn(2, "Preis");
+    listView->InsertColumn(3, "Gesamt");
+    listView->SetColumnWidth(0, 100);
+    listView->SetColumnWidth(1, 200);
+    listView->SetColumnWidth(2, 100);
+    listView->SetColumnWidth(3, 100);
 
-	database.setAccountNumber();
-	wxString accountNumber = wxString::Format("Rechnungsnummer: %d", database.getAccountNumber());
+    displaySizer->Add(listView, 5, wxALL | wxEXPAND, 5);
 
-	displayAccountNumber = new wxTextCtrl( this, wxID_ANY, accountNumber, wxDefaultPosition, wxDefaultSize, wxTE_LEFT|wxBORDER_NONE |wxTE_READONLY );
-	displayAccountNumber->Enable( false );
-	displayAccountNumber->SetFont( wxFont( 15, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, wxT("Sans") ) );
-	displayAccountNumber->SetForegroundColour( wxColour( 240, 240, 240 ) );
-	displayAccountNumber->SetBackgroundColour( wxColour( 48, 48, 48 ) );
+    wxStaticText *text = new wxStaticText( this, wxID_ANY, wxT("Gesamt"), wxDefaultPosition, wxDefaultSize, 0 );
+    text->Wrap( -1 );
+    text->SetFont( wxFont( 14, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD, false, wxT("Sans") ) );
+    text->SetForegroundColour( wxColour( 240, 240, 240 ) );
 
-	sizerDisplays->Add( displayAccountNumber, 2, wxALL|wxEXPAND, 5 );
+    displaySizer->Add( text, 0, wxALL|wxEXPAND, 5 );
 
-	listView = new wxListView(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLC_REPORT | wxLC_SINGLE_SEL);
-	listView->SetFont( wxFont( 14, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, wxT("Sans") ) );
-	listView->InsertColumn(0, "Anzahl");
-	listView->InsertColumn(1, "Produkt");
-	listView->InsertColumn(2, "Preis");
-	listView->InsertColumn(3, "Gesamt");
-	listView->SetColumnWidth(0, 100);
-	listView->SetColumnWidth(1, 200);
-	listView->SetColumnWidth(2, 100);
-	listView->SetColumnWidth(3, 100);
-
-	sizerDisplays->Add( listView, 10, wxALL|wxEXPAND, 5 );
-
-	wxStaticText *textSum = new wxStaticText( this, wxID_ANY, wxT("Gesamt"), wxDefaultPosition, wxDefaultSize, 0 );
-	textSum->Wrap( -1 );
-	textSum->SetFont( wxFont( 18, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, wxT("Sans") ) );
-	textSum->SetForegroundColour( wxColour( 240, 240, 240 ) );
-
-	sizerDisplays->Add( textSum, 1, wxALL|wxEXPAND, 5 );
-
-	displaySum = new wxTextCtrl( this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_RIGHT|wxTE_READONLY );
-	displaySum->SetFont( wxFont( 20, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, wxT("Sans") ) );
+    displaySum = new wxTextCtrl( this, wxID_ANY, "0.00", wxDefaultPosition, wxDefaultSize, wxTE_RIGHT | wxTE_READONLY );
+    displaySum->SetFont( wxFont( 16, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, wxT("Sans") ) );
 	displaySum->Enable( false );
+    displaySizer->Add( displaySum, 1, wxALL|wxEXPAND, 5 );
 
-	sizerDisplays->Add( displaySum, 2, wxALL|wxEXPAND, 5 );
+    middleSizer->Add( displaySizer, 2, wxEXPAND, 5 );
 
-	sizerMiddle->Add( sizerDisplays, 2, wxALL|wxEXPAND, 5 );
+    wxBoxSizer* controlSizer;
+    controlSizer = new wxBoxSizer( wxHORIZONTAL );
 
-	displaySum->SetValue(wxString::Format("%.2f", _sum));
+    wxBoxSizer* leftControlSizer;
+    leftControlSizer = new wxBoxSizer( wxVERTICAL );
 
-	wxBoxSizer* sizerControls = new wxBoxSizer( wxHORIZONTAL );
+    wxBoxSizer* buttonSizer;
+    buttonSizer = new wxBoxSizer( wxHORIZONTAL );
 
-	wxBoxSizer* sizerOptions = new wxBoxSizer( wxVERTICAL );
+    wxButton *decrementButton = new wxButton( this, wxID_ANY, wxT("-"), wxDefaultPosition, wxDefaultSize, 0 );
+    decrementButton->SetFont( wxFont( 14, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD, false, wxT("Sans") ) );
+    decrementButton->SetBackgroundColour( wxColour( 176, 176, 176 ) );
+    decrementButton->SetMinSize( wxSize( 20,20 ) );
 
-	wxBoxSizer* sizerAmount = new wxBoxSizer( wxHORIZONTAL );
+    decrementButton->Bind(wxEVT_BUTTON, &MainFrame::onButtonDecrement, this);
 
-	wxButton *buttonDelete = new wxButton( this, wxID_ANY, wxT("X"), wxDefaultPosition, wxDefaultSize, 0 );
-	buttonDelete->SetFont( wxFont( 20, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD, false, wxT("Sans") ) );
-	buttonDelete->SetForegroundColour( wxColour( 240, 240, 240 ) );
-	buttonDelete->SetBackgroundColour( wxColour( 251, 17, 42 ) );
-	buttonDelete->SetMinSize( wxSize( 20,20 ) );
+    buttonSizer->Add( decrementButton, 1, wxALL|wxEXPAND, 10 );
 
-	buttonDelete->Bind(wxEVT_BUTTON, &MainFrame::onButtonDelete, this);
+    wxButton *incrementButton = new wxButton( this, wxID_ANY, wxT("+"), wxDefaultPosition, wxDefaultSize, 0 );
+    incrementButton->SetFont( wxFont( 14, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD, false, wxT("Sans") ) );
+    incrementButton->SetBackgroundColour( wxColour( 176, 176, 176 ) );
+    incrementButton->SetMinSize( wxSize( 20,20 ) );
 
-	sizerAmount->Add( buttonDelete, 1, wxALL|wxEXPAND, 5 );
+    incrementButton->Bind(wxEVT_BUTTON, &MainFrame::onButtonIncrement, this);
 
-	wxButton *buttonDecrement = new wxButton( this, wxID_ANY, wxT("-"), wxDefaultPosition, wxDefaultSize, 0 );
-	buttonDecrement->SetFont( wxFont( 20, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD, false, wxT("Sans") ) );
-	buttonDecrement->SetForegroundColour( wxColour( 240, 240, 240 ) );
-	buttonDecrement->SetBackgroundColour( wxColour( 96, 96, 96 ) );
-	buttonDecrement->SetMinSize( wxSize( 20,20 ) );
+    buttonSizer->Add( incrementButton, 1, wxALL|wxEXPAND, 10 );
 
-	buttonDecrement->Bind(wxEVT_BUTTON, &MainFrame::onButtonDecrement, this);
+    leftControlSizer->Add( buttonSizer, 1, wxBOTTOM|wxEXPAND|wxTOP, 20 );
 
-	sizerAmount->Add( buttonDecrement, 1, wxALL|wxEXPAND, 5 );
+    wxButton *deleteButton = new wxButton( this, wxID_ANY, wxT("X"), wxDefaultPosition, wxDefaultSize, 0 );
+    deleteButton->SetFont( wxFont( 14, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD, false, wxT("Sans") ) );
+    deleteButton->SetForegroundColour( wxColour( 240, 240, 240 ) );
+    deleteButton->SetBackgroundColour( wxColour( 219, 41, 41 ) );
+    deleteButton->SetMinSize( wxSize( 20,20 ) );
 
-	wxButton *buttonIncrement = new wxButton( this, wxID_ANY, wxT("+"), wxDefaultPosition, wxDefaultSize, 0 );
-	buttonIncrement->SetFont( wxFont( 20, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD, false, wxT("Sans") ) );
-	buttonIncrement->SetForegroundColour( wxColour( 240, 240, 240 ) );
-	buttonIncrement->SetBackgroundColour( wxColour( 96, 96, 96 ) );
-	buttonIncrement->SetMinSize( wxSize( 20,20 ) );
+    deleteButton->Bind(wxEVT_BUTTON, &MainFrame::onButtonDelete, this);
 
-	buttonIncrement->Bind(wxEVT_BUTTON, &MainFrame::onButtonIncrement, this);
+    leftControlSizer->Add(deleteButton, 1, wxLEFT | wxRIGHT | wxBOTTOM | wxEXPAND, 30 );
 
-	sizerAmount->Add( buttonIncrement, 1, wxALL|wxEXPAND, 5 );
+    controlSizer->Add( leftControlSizer, 1, wxEXPAND, 10 );
 
-	sizerOptions->Add( sizerAmount, 1, wxALL|wxEXPAND, 10 );
+    wxBoxSizer* rightControlsizer;
+    rightControlsizer = new wxBoxSizer( wxVERTICAL );
 
-	wxPanel *m_panel2 = new wxPanel( this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL );
-	m_panel2->SetBackgroundColour( wxColour( 48, 48, 48 ) );
+    wxButton *clearButton= new wxButton( this, wxID_ANY, wxT("CLEAR"), wxDefaultPosition, wxDefaultSize, 0 );
+    clearButton->SetFont( wxFont( 14, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD, false, wxT("Sans") ) );
+    clearButton->SetForegroundColour( wxColour( 240, 240, 240 ) );
+    clearButton->SetBackgroundColour( wxColour( 218, 42, 42 ) );
 
-	sizerOptions->Add( m_panel2, 1, wxALL|wxEXPAND, 5 );
+    clearButton->Bind(wxEVT_BUTTON, &MainFrame::onButtonClear, this);
 
-	wxBoxSizer* sizerCommits = new wxBoxSizer( wxVERTICAL );
+    rightControlsizer->Add(clearButton, 1, wxALL|wxEXPAND, 10 );
 
-	wxButton *buttonClear = new wxButton( this, wxID_ANY, wxT("STORNO"), wxDefaultPosition, wxDefaultSize, 0 );
-	buttonClear->SetFont( wxFont( 16, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD, false, wxT("Sans") ) );
-	buttonClear->SetForegroundColour( wxColour( 240, 240, 240 ) );
-	buttonClear->SetBackgroundColour( wxColour( 251, 17, 42 ) );
+    wxButton *saleButton = new wxButton( this, wxID_ANY, wxT("CASH"), wxDefaultPosition, wxDefaultSize, 0 );
+    saleButton->SetFont( wxFont( 14, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD, false, wxT("Sans") ) );
+    saleButton->SetForegroundColour( wxColour( 240, 240, 240 ) );
+    saleButton->SetBackgroundColour( wxColour( 21, 151, 57 ) );
 
-	buttonClear->Bind(wxEVT_BUTTON, &MainFrame::onButtonClear, this);
+    saleButton->Bind(wxEVT_BUTTON, &MainFrame::onButtonSale, this);
 
-	sizerCommits->Add( buttonClear, 1, wxALL|wxEXPAND, 5 );
+    rightControlsizer->Add( saleButton, 2, wxALL|wxEXPAND, 10 );
 
-	wxButton *buttonSale = new wxButton( this, wxID_ANY, wxT("BAR"), wxDefaultPosition, wxDefaultSize, 0 );
-	buttonSale->SetFont( wxFont( 20, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD, false, wxT("Sans") ) );
-	buttonSale->SetForegroundColour( wxColour( 240, 240, 240 ) );
-	buttonSale->SetBackgroundColour( wxColour( 17, 170, 39 ) );
+    controlSizer->Add( rightControlsizer, 1, wxEXPAND, 5 );
 
-	buttonSale->Bind(wxEVT_BUTTON, &MainFrame::onButtonInvoice, this);
+    middleSizer->Add( controlSizer, 1, wxEXPAND, 5 );
 
-	sizerCommits->Add( buttonSale, 2, wxALL|wxEXPAND, 5 );
+    mainSizer->Add( middleSizer, 4, wxALL|wxEXPAND, 20 );
 
-	sizerControls->Add( sizerOptions, 3, wxALL|wxEXPAND, 5 );
-	sizerControls->Add( sizerCommits, 2, wxALL|wxEXPAND, 5 );
+    /*************************RIGHT SIZER****************************/
 
+    wxBoxSizer* rightSizer = new wxBoxSizer( wxVERTICAL );
 
-	sizerMiddle->Add( sizerControls, 1, wxBOTTOM|wxEXPAND|wxLEFT, 20 );
+    _date = getCurrentDate();
+    wxString date(_date);
 
-	sizerMain->Add( sizerMiddle, 6, wxEXPAND, 5 );
+    wxTextCtrl *displayDate = new wxTextCtrl( this, wxID_ANY, date, wxDefaultPosition, wxDefaultSize, wxTE_RIGHT|wxBORDER_NONE );
+    displayDate->SetFont( wxFont( 12, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD, false, wxT("Sans") ) );
+    displayDate->SetForegroundColour( wxColour( 240, 240, 240 ) );
+    displayDate->SetBackgroundColour( wxColour( 64, 64, 64 ) );
 
-//*****************************************************************************************************************
-// sizerRight contains the buttons for the categories and their products
+    rightSizer->Add( displayDate, 1, wxALL|wxEXPAND, 10 );
 
-    wxBoxSizer* sizerRight;
-	sizerRight = new wxBoxSizer( wxVERTICAL );
+    wxGridSizer* categorySizer = new wxGridSizer( 0, 3, 0, 0 );
 
+    productSizer = new wxFlexGridSizer( 0, 4, 0, 0 );
+    productSizer->SetFlexibleDirection(wxHORIZONTAL);
+    productSizer->SetNonFlexibleGrowMode(wxFLEX_GROWMODE_SPECIFIED);
+    productSizer->AddGrowableCol(0);
+    productSizer->AddGrowableCol(1);
+    productSizer->AddGrowableCol(2);
+    productSizer->AddGrowableCol(3);
 
+    std::vector<Category> categories = database.getCategories();
 
-
-	wxTextCtrl *displayUser = new wxTextCtrl( this, wxID_ANY, wxT("Kellner1"), wxDefaultPosition, wxDefaultSize, wxTE_RIGHT|wxBORDER_NONE |wxTE_READONLY );
-	displayUser->Enable( false );
-	displayUser->SetFont( wxFont( 20, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, wxT("Sans") ) );
-	displayUser->SetForegroundColour( wxColour( 240, 240, 240 ) );
-	displayUser->SetBackgroundColour( wxColour( 48, 48, 48 ) );
-
-	sizerRight->Add( displayUser, 1, wxEXPAND|wxRIGHT|wxTOP, 20 );
-	//---------------------------------------------------------------------------------
-	// read the categories from the database and create a button for each one of it.
-	// the id of the button corresponds to the id of the category in the database
-
-	wxGridSizer* categorySizer = new wxGridSizer( 0, 3, 0, 0 );
-	productSizer = new wxFlexGridSizer( 0, 4, 0, 0 );
-	productSizer->SetFlexibleDirection(wxBOTH);
-	productSizer->SetNonFlexibleGrowMode(wxFLEX_GROWMODE_SPECIFIED);
-	productSizer->AddGrowableCol(0);
-	productSizer->AddGrowableCol(1);
-	productSizer->AddGrowableCol(2);
-	productSizer->AddGrowableCol(3);
-
-	database.getCategories();
-
-	for (const auto& cat : database.categories) {
-	wxButton *categoryButton = new wxButton( this, cat.id, cat.name, wxDefaultPosition, wxDefaultSize, 0);
-	categoryButton->SetFont( wxFont( 14, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD, false, wxT("Sans")));
-	categoryButton->SetForegroundColour( wxColour( 240, 240, 240 ));
-	categoryButton->SetBackgroundColour( wxColour( 59, 122, 87 ));
-
-	categoryButton->Bind(wxEVT_BUTTON, &MainFrame::onCategoryButtonClicked, this);
-
-	categorySizer->Add( categoryButton, 1, wxALL|wxEXPAND, 5 );
-
-	//For each category get all the products from the database and create a button which is hidden by default
-
-	database.getProducts(cat.id);
-		for (const auto& prod : database.products) {
-		productButton = new wxButton( this, prod.id, prod.name, wxDefaultPosition, wxDefaultSize, 0);
-		productButton->SetMinSize(wxSize(0, 100));
-		productButton->SetFont( wxFont( 14, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD, false, wxT("Sans")));
-		productButton->SetForegroundColour( wxColour( 240, 240, 240 ));
-		productButton->SetBackgroundColour( wxColour( 59, 122, 87 ));
-		productButton->Bind(wxEVT_BUTTON, &MainFrame::onProductButtonClicked, this);
-		productButton->Hide();
-		productSizer->Add( productButton, 1, wxALL|wxEXPAND, 5 );
-		//productSizer->Hide(this->FindWindowById(prod.id));
-		}
-	}
-
-	//---------------------------------------------------------------------------------------
-	//get the products of the first category and show the buttons
-
-	database.getProducts(_categoryId);
-	for (const auto& prod : database.products){
-		(this->FindWindowById(prod.id))->Show();
-		//productSizer->Show(this->FindWindowById(prod.id));
-	}
-
-	sizerRight->Add( categorySizer, 5, wxALL|wxEXPAND, 20 );
-	sizerRight->Add( productSizer, 6, wxALL|wxEXPAND, 20 );
-
-	sizerMain->Add( sizerRight, 8, wxEXPAND, 5 );
-
-
-	this->SetSizer( sizerMain );
-	this->Layout();
-
-	this->Centre( wxBOTH );
-
-}
-
-/***********************************************************************
- * Zeigt die Produkt-Buttons der gewählten Kategorie (button->Show())
- * ********************************************************************/
-
-	void MainFrame::onCategoryButtonClicked(wxCommandEvent& evt){
-
-	database.getProducts(_categoryId);
-
-	for (const auto& prod : database.products){
-		(this->FindWindowById(prod.id))->Hide();
-		//productSizer->Hide(this->FindWindowById(prod.id));
-
-	}
-	_categoryId = evt.GetId();
-	//wxMessageBox(wxString::Format("%d was clicked!",_categoryId));
-
-	database.getProducts(_categoryId);
-	for (const auto& prod : database.products){
-		(this->FindWindowById(prod.id))->Show();
-		//productSizer->Show(this->FindWindowById(prod.id));
-
-	}
-	Layout();
-	}
-
-/***********************************************************************
- * Aktualisiert die Anzeige der Produkte auf der aktuellen Rechnung im listView
- * Befindet sich das betreffende Produkt bereits auf der Liste wird die Anzahl erhöht
- * ansonsten wird das Produkt der Liste hinzugefügt
- * ********************************************************************/
-	void MainFrame::addProductToDisplay(int id) {
- 			auto it = std::find_if(_displayProducts.begin(), _displayProducts.end(), [&](const displayProduct& p) {
- 				return p.id == id;
- 			});
-
- 			if (it != _displayProducts.end()) {
- 				it->count += 1;
- 				//std::cout << "Display, One more" << std::endl;
-				auto index = std::distance(_displayProducts.begin(), it);
-				//std::cout << "Index: " << index << std::endl;
-				listView->SetItem(index, 0, wxString::Format("%d", it->count));
-				listView->SetItem(index, 3, wxString::Format("%.2f", it->price * it->count));
-				_sum += it->price;
-				displaySum->SetValue(wxString::Format("%.2f", _sum));
-
- 			} else {
- 				_displayProducts.push_back(_displayProduct);
-
- 				std::cout << "Display, Added Product" << std::endl;
- 				long index = listView->InsertItem(listView->GetItemCount(), wxString::Format("%d", _displayProduct.count));
- 				listView->SetItem(index, 1, _displayProduct.name);
-				//double rounded = std::round(_displayProduct.price * 100.0) / 100.0;
- 				listView->SetItem(index, 2, wxString::Format("%.2f", _displayProduct.price));
- 				listView->SetItem(index, 3, wxString::Format("%.2f", _displayProduct.price * _displayProduct.count));
-
-				_sum += _displayProduct.price;
-				displaySum->SetValue(wxString::Format("%.2f", _sum));
-
- 			}
-
-			for(auto& prod : _displayProducts){
-				std::cout << prod.count << "   " << prod.name << "   " << prod.price << "   " << std::endl;
-			}
+    for (const auto& cat : categories)
+    {
+        wxButton *categoryButton = new wxButton( this, cat.id, cat.name, wxDefaultPosition, wxDefaultSize, 0);
+        categoryButton->SetFont( wxFont( 14, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD, false, wxT("Sans")));
+        categoryButton->SetForegroundColour( wxColour( 240, 240, 240 ));
+        categoryButton->SetBackgroundColour( wxColour( 59, 122, 87 ));
+
+        categoryButton->Bind(wxEVT_BUTTON, &MainFrame::onCategoryButton, this);
+
+        categorySizer->Add( categoryButton, 1, wxALL|wxEXPAND, 5 );
+
+        //For each category get all the products from the database and create a button which is hidden by default
+        _products = database.getProducts(cat.id);
+        for (const auto& prod : _products)
+        {
+            productButton = new wxButton( this, prod.id, prod.name, wxDefaultPosition, wxDefaultSize, 0);
+            productButton->SetMinSize(wxSize(0, 100));
+            productButton->SetFont( wxFont( 14, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD, false, wxT("Sans")));
+            productButton->SetForegroundColour( wxColour( 240, 240, 240 ));
+            productButton->SetBackgroundColour( wxColour( 59, 122, 87 ));
+            productButton->Bind(wxEVT_BUTTON, &MainFrame::onProductButton, this);
+            productButton->Hide();
+            productSizer->Add( productButton, 1, wxALL|wxEXPAND, 5 );
+            //productSizer->Hide(this->FindWindowById(prod.id));
+        }
     }
 
-/***********************************************************************
- * Fügt der aktuellen Rechnung ein Produkt hinzu oder erhöht die Anzahl
- * wenn das betreffende Produkt bereits auf der Rechnung ist
- * ********************************************************************/
+    _products = database.getProducts(_categoryId);
+    for (const auto& prod : _products)
+    {
+        //(this->FindWindowById(prod.id))->Show();
+        productSizer->Show(this->FindWindowById(prod.id));
+    }
 
-	void MainFrame::onProductButtonClicked(wxCommandEvent& evt){
-		int productId = evt.GetId();
-		//wxMessageBox(wxString::Format("%d was clicked!",productId));
-		database.getProduct(productId);
-		_displayProduct.id = database.getProductId();
-		_displayProduct.name = database.getProductName();
-		_displayProduct.price = database.getProductPrice();
-		_displayProduct.tax = database.getProductTax();
-		addProductToDisplay(productId);
-		database.addProductToAccount(productId);
-	}
+    rightSizer->Add( categorySizer, 3, wxALL|wxEXPAND, 10 );
 
-/***********************************************************************
- * Entfernt alle Positionen der aktuellen Rechnung
- * ********************************************************************/
+    rightSizer->Add( productSizer, 5, wxALL|wxEXPAND, 10 );
 
-	void MainFrame::onButtonClear(wxCommandEvent& evt){
-		_displayProducts.clear();
-		database.clearAccount();
-		_sum = 0.0;
-		displaySum->SetValue(wxString::Format("%.2f", _sum));
-		listView->DeleteAllItems();
-	}
+    mainSizer->Add( rightSizer, 6, wxALL|wxEXPAND, 20 );
 
-/***********************************************************************
- * Erhöht die Anzahl eines Artikels auf der aktuellen Rechnung
- * ********************************************************************/
-
-	void MainFrame::onButtonDecrement(wxCommandEvent& evt){
-		int index = listView->GetFirstSelected();
-		if (index != -1) {
-			database.decrementAmountOfPosition(index);
-			if(_displayProducts[index].count > 1) {
-			_displayProducts[index].count -= 1;
-			listView->SetItem(index, 0, wxString::Format("%d", _displayProducts[index].count));
-			listView->SetItem(index, 3, wxString::Format("%.2f", _displayProducts[index].count * _displayProducts[index].price));
-			_sum -= _displayProducts[index].price;
-			displaySum->SetValue(wxString::Format("%.2f", _sum));
-			}
-
-		} else {
-			// No item selected
-			wxMessageBox("Kein Artikel markiert", "Warnung", wxOK | wxICON_WARNING);
-
-			}
-	}
-
-/***********************************************************************
- * Erhöht die Anzahl eines Artikels auf der aktuellen Rechnung
- * ********************************************************************/
-
-	void MainFrame::onButtonIncrement(wxCommandEvent& evt){
-		int index = listView->GetFirstSelected();
-		if (index != -1) {
-			database.incrementAmountOfPosition(index);
-			_displayProducts[index].count += 1;
-			listView->SetItem(index, 0, wxString::Format("%d", _displayProducts[index].count));
-			listView->SetItem(index, 3, wxString::Format("%.2f", _displayProducts[index].count * _displayProducts[index].price));
-			_sum += _displayProducts[index].price;
-			displaySum->SetValue(wxString::Format("%.2f", _sum));
+    this->SetSizer( mainSizer );
+    this->Layout();
+}
 
 
-		} else {
-			// No item selected
-			wxMessageBox("Kein Artikel markiert", "Warnung", wxOK | wxICON_WARNING);
+std::string MainFrame::getCurrentDate() {
+    // Aktuelles Datum abrufen
+    std::time_t now = std::time(nullptr);
+    std::tm* date = std::localtime(&now);
 
-			}
-	}
+    // Datum im Format "TT.MM.JJJJ" erzeugen
+    std::ostringstream oss;
+    oss << std::setfill('0') << std::setw(2) << date->tm_mday << '.'
+    << std::setfill('0') << std::setw(2) << (date->tm_mon + 1) << '.'
+    << (date->tm_year + 1900);
 
-/***********************************************************************
- * Löscht die ausgewählte Position von der aktuellen Rechnung
- * ********************************************************************/
+    return oss.str();
+}
 
-	void MainFrame::onButtonDelete(wxCommandEvent& evt){
-		int index = listView->GetFirstSelected();
-		if (index != -1) {
-			database.deletePosition(index);
-			_sum -= _displayProducts[index].price * _displayProducts[index].count;
-			_displayProducts.erase(_displayProducts.begin() + index);
-			listView->DeleteItem(index);
-			displaySum->SetValue(wxString::Format("%.2f", _sum));
-			index = -1;
-		} else {
-			// No item selected
-			wxMessageBox("Kein Artikel markiert", "Warnung", wxOK | wxICON_WARNING);
+/**
+ * Event handler for category buttons.
+ * Hides the products currently displayed and shows the products of the selected category.
+ * @param evt The wxCommandEvent representing the button click event.
+ */
+void MainFrame::onCategoryButton(wxCommandEvent& evt)
+{
 
-			}
-	}
+    // Hide the products currently displayed
+    for (const auto& prod : _products)
+    {
+        (this->FindWindowById(prod.id))->Hide();
+        //productSizer->Hide(this->FindWindowById(prod.id));
+    }
+    _categoryId = evt.GetId();
+    // Get the products of the selected category from the database
+    _products = database.getProducts(_categoryId);
 
-/***********************************************************************
- * Erstellt ein File als Rechnung
- * ********************************************************************/
+    // Show the products of the selected category
+    for (const auto& prod : _products)
+    {
+        (this->FindWindowById(prod.id))->Show();
+        //productSizer->Show(this->FindWindowById(prod.id));
+    }
+    Layout(); // Update the layout to reflect the changes
+}
 
-	void MainFrame::issueInvoice(){
+/**
+ * Adds a product to the display.
+ * If the product already exists in the account, increments the quantity and updates the display accordingly.
+ * If the product is new, adds it to the account and creates a new entry in the display.
+ * @param id The ID of the product to add.
+ */
+void MainFrame::addProductToDisplay(int id)
+{
 
-		std::string text1 = ".txt";
-		std::string text2 = "Rechnung";
-		std::string name = std::to_string(database.getAccountNumber());
-		std::string filename = text2 + name + text1;
+    // Check if the product already exists in the account
+    auto it = std::find_if(_account.begin(), _account.end(), [&](const Product& p)
+    {
+        return p.id == id;
+    });
 
-		double tax20 = 0.0;
-		double tax10 = 0.0;
-		double sum = 0.0;
+    if (it != _account.end())
+    {
+        // Increment the quantity and update the display
+        it->amount += 1;
+        auto index = std::distance(_account.begin(), it);
+        //std::cout << "Index: " << index << std::endl;
+        listView->SetItem(index, 0, wxString::Format("%d", it->amount));
+        listView->SetItem(index, 3, wxString::Format("%.2f", it->price * it->amount));
+        _account[index].amount = it->amount;
+        _sum += it->price;
+        displaySum->SetValue(wxString::Format("%.2f", _sum));
 
-		std::ofstream file(filename);
+    } else
+    {
+        // Add the product to the account and create a new entry in the display
+        _account.push_back(_product);
+
+        //std::cout << "Display, Added Product" << std::endl;
+        long index = listView->InsertItem(listView->GetItemCount(), wxString::Format("%d", _product.amount));
+        listView->SetItem(index, 1, _product.name);
+        //double rounded = std::round(_displayProduct.price * 100.0) / 100.0;
+        listView->SetItem(index, 2, wxString::Format("%.2f", _product.price));
+        listView->SetItem(index, 3, wxString::Format("%.2f", _product.price * _product.amount));
+
+
+        _sum += _product.price;
+        displaySum->SetValue(wxString::Format("%.2f", _sum));
+    }
+
+    for(auto& prod : _account){
+        std::cout << prod.amount << "   " << prod.name << "   " << prod.price << " | ";
+    }
+    std::cout << std::endl;
+}
+
+/**
+ * Handles the click event of a product button.
+ * Retrieves the product information based on the button's ID from the database,
+ * and adds the product to the display.
+ */
+void MainFrame::onProductButton(wxCommandEvent& evt)
+{
+
+    int productId = evt.GetId();
+
+    _product = database.getProduct(productId); // Retrieve the product information from the database
+
+    addProductToDisplay(productId); // Add the product to the display
+}
+
+/**
+ * Increments the quantity of the selected item in the account by 1 and updates the total sum and list view accordingly.
+ * If no item is selected, it displays a warning message.
+ */
+void MainFrame::onButtonIncrement(wxCommandEvent& evt)
+{
+    int index = listView->GetFirstSelected();
+    if (index != -1) {
+
+        _account[index].amount += 1; // Increase the quantity of the selected item by 1
+
+        // Update the quantity and total price displayed in the list view
+        listView->SetItem(index, 0, wxString::Format("%d", _account[index].amount));
+        listView->SetItem(index, 3, wxString::Format("%.2f", _account[index].amount * _account[index].price));
+
+        // Update the total sum by adding the price of one item
+        _sum += _account[index].price;
+        displaySum->SetValue(wxString::Format("%.2f", _sum));
+
+    } else {
+        // No item selected
+        wxMessageBox("Kein Artikel markiert", "Warnung", wxOK | wxICON_WARNING);
+    }
+}
+
+/**
+ * Decrements the quantity of the selected item in the account by 1 and updates the total sum and list view accordingly.
+ * If no item is selected or the quantity is already 1, it displays a warning message.
+ */
+void MainFrame::onButtonDecrement(wxCommandEvent& evt)
+{
+    int index = listView->GetFirstSelected();
+    if (index != -1) {
+        if(_account[index].amount > 1) {
+
+            // Decrease the quantity of the selected item by 1
+            _account[index].amount -= 1;
+
+            // Update the quantity and total price displayed in the list view
+            listView->SetItem(index, 0, wxString::Format("%d", _account[index].amount));
+            listView->SetItem(index, 3, wxString::Format("%.2f", _account[index].amount * _account[index].price));
+
+            // Update the total sum by subtracting the price of one item
+            _sum -= _account[index].price;
+            displaySum->SetValue(wxString::Format("%.2f", _sum));
+        }
+
+    } else {
+        // No item selected
+        wxMessageBox("Kein Artikel markiert", "Warnung", wxOK | wxICON_WARNING);
+    }
+}
+
+/**
+ * Deletes the selected item from the account and updates the total sum and list view accordingly.
+ * If no item is selected, it displays a warning message.
+ */
+void MainFrame::onButtonDelete(wxCommandEvent& evt)
+{
+
+    int index = listView->GetFirstSelected();
+    if (index != -1) {
+
+        // Calculate the price without and update the total sum
+        _sum -= _account[index].price * _account[index].amount;
+
+        // Remove the selected item from the account and the list view
+        _account.erase(_account.begin() + index);
+        listView->DeleteItem(index);
+
+        // Update the displayed total sum
+        displaySum->SetValue(wxString::Format("%.2f", _sum));
+
+        index = -1; // Reset the index
+
+    } else {
+        // No item selected
+        wxMessageBox("Kein Artikel markiert", "Warnung", wxOK | wxICON_WARNING);
+
+    }
+}
+
+/**
+ * Clears the current account, resets the total sum to zero, and clears the items displayed in the list view.
+ */
+
+void MainFrame::onButtonClear(wxCommandEvent& evt)
+{
+    // Clear the current account and reset the total sum
+    _account.clear();
+    _sum = 0.0;
+    // Update the displayed total sum
+    displaySum->SetValue(wxString::Format("%.2f", _sum));
+    // Clear the items displayed in the list view
+    listView->DeleteAllItems();
+}
+
+/**
+ * Generates and saves an invoice as a text file.
+ * The file is named using the account number and contains the invoice details and calculated amounts.
+ * The invoice includes the company name, address, invoice number, date, item details, and total amount.
+ * It also calculates and includes the tax amounts and the net and gross amounts for each tax rate.
+ * Finally, it includes a closing message.
+ */
+void MainFrame::issueInvoice()
+{
+
+    std::string text1 = ".txt";
+    std::string text2 = "Rechnung";
+    std::string name = std::to_string(_accountNumber);
+    std::string filename = text2 + name + text1;
+
+    double tax20 = 0.0;
+    double tax10 = 0.0;
+    double sum = 0.0;
+
+    std::ofstream file(filename);
 
     if (file.is_open()) {
-		file << "\n\n\n" << "Firmenname" << std::endl;
-		file << "Strasse 00 " <<  std::endl;
-		file << "O000 Ortschaft " <<  std::endl <<  std::endl <<  std::endl;
-		file << "Rechnungsnummer: " << name <<  std::endl;
-		file << "Datum: " << name <<  std::endl <<  std::endl;
+        file << "\n\n\n" << "Firmenname" << std::endl;
+        file << "Strasse 00 " <<  std::endl;
+        file << "O000 Ortschaft " <<  std::endl <<  std::endl <<  std::endl;
+        file << "Rechnungsnummer: " << name <<  std::endl;
+        file << "Datum: " << _date <<  std::endl <<  std::endl;
 
 
-		file << "Anzahl	" << "Artikel				" << "Einzelpreis			" << "Gesamt" <<  std::endl;
-		file << "_____________________________________________________________________" <<  std::endl;
+        file << "Anzahl	" << "Artikel				" << "Einzelpreis			" << "Gesamt" <<  std::endl;
+        file << "_____________________________________________________________________" <<  std::endl;
 
 
-		for (const auto& prod : _displayProducts){
+        for (const auto& prod : _account)
+        {
 
-            file << prod.count << "		" << prod.name << "				";
-			file << std::fixed << std::setprecision(2) << prod.price << "				" << (prod.price * prod.count) <<std::endl;;
+            file << prod.amount << "		" << prod.name << "				";
+            file << std::fixed << std::setprecision(2) << prod.price << "				" << (prod.price * prod.amount) <<std::endl;;
 
-			if(prod.tax == 1.2){
-				tax20 += prod.price * prod.count;
-			}
-			if(prod.tax == 1.1){
-				tax10 += prod.price * prod.count;
-			}
-			sum += prod.price * prod.count;
+            if(prod.tax == 1.2){
+                tax20 += prod.price * prod.amount;
+            }
+            if(prod.tax == 1.1){
+                tax10 += prod.price * prod.amount;
+            }
+            sum += prod.price * prod.amount;
         }
         file << "_____________________________________________________________________" <<  std::endl;
-		file << "									Gesamt: EUR ";
-		file << std::fixed << std::setprecision(2) << sum <<  std::endl <<  std::endl;
+        file << "									Gesamt: EUR ";
+        file << std::fixed << std::setprecision(2) << sum <<  std::endl <<  std::endl;
 
-		double netto20 = tax20/1.2;
-		double netto10 = tax10/1.1;
+        double netto20 = tax20/1.2;
+        double netto10 = tax10/1.1;
 
-		file << "MwSt. 20%:	" << "Netto: ";
-		file << std::fixed << std::setprecision(2) << netto20 ;
-		file << "		MwSt: ";
-		file << std::fixed << std::setprecision(2) << tax20 - netto20 ;
-		file << "	Brutto: ";
-		file << std::fixed << std::setprecision(2) << tax20  << std::endl;
-		file << "MwSt. 10%:	";
-		file << "Netto: ";
-		file << std::fixed << std::setprecision(2) << netto10 ;
-		file << "	MwSt: ";
-		file << std::fixed << std::setprecision(2) << tax10 - netto10;
-		file << "	Brutto: ";
-		file << std::fixed << std::setprecision(2) << tax10 <<std::endl <<std::endl <<std::endl;
+        file << "MwSt. 20%:	" << "Netto: ";
+        file << std::fixed << std::setprecision(2) << netto20 ;
+        file << "		MwSt: ";
+        file << std::fixed << std::setprecision(2) << tax20 - netto20 ;
+        file << "	Brutto: ";
+        file << std::fixed << std::setprecision(2) << tax20  << std::endl;
+        file << "MwSt. 10%:	";
+        file << "Netto: ";
+        file << std::fixed << std::setprecision(2) << netto10 ;
+        file << "		MwSt: ";
+        file << std::fixed << std::setprecision(2) << tax10 - netto10;
+        file << "	Brutto: ";
+        file << std::fixed << std::setprecision(2) << tax10 <<std::endl <<std::endl <<std::endl;
 
-		file << "Vielen Dank"  <<std::endl <<std::endl <<std::endl;
+        file << "Vielen Dank"  <<std::endl <<std::endl <<std::endl;
 
         file.close();
 
         std::cout << "File written successfully." << std::endl;
-    } else {
+    } else
+    {
+        std::cerr << "Unable to open file." << std::endl;
+    }
+}
+
+/*
+ * Event handler for the "Sale" button click.
+ * Performs various actions related to completing a sale transaction, including issuing an invoice,
+ * writing account and sales data to the database, clearing the account and sum variables,
+ * updating the displayed sum and account number, and updating the layout.
+ */
+void MainFrame::onButtonSale(wxCommandEvent& evt)
+{
+    issueInvoice();
+    database.writeInvoiceToDatabase(_accountNumber, _user);
+    database.writeSalesToDatabase(_account, _accountNumber);
+    _account.clear();
+    _sum = 0.0;
+    displaySum->SetValue(wxString::Format("%.2f", _sum));
+    listView->DeleteAllItems();
+    _accountNumber = database.getAccountNumber();
+    displayNumber->SetValue(wxString::Format("%d", _accountNumber));
+    Layout();
+}
+
+/**
+ * Event handler for the "Closing" button.
+ * Generates a closing report, clears the account data, and deletes all sales records in the database.
+ * Updates the display and layout accordingly.
+ */
+
+void MainFrame::onButtonClosing(wxCommandEvent& evt)
+{
+    wxMessageDialog dialog(this, "Accomplished daily closing?", "Confirmation", wxYES_NO | wxICON_QUESTION);
+
+    int result = dialog.ShowModal();
+
+    if (result != wxID_YES)
+    {
+        return;
+    }
+    else
+    {
+    double sum = database.getFinalSum();
+    double sum10 = database.getFinalSumTax10();
+    double sum20 = database.getFinalSumTax20();
+
+    std::string text1 = ".txt";
+    std::string text2 = "Tagesabschluss";
+
+    std::string date = _date;
+    size_t dotPosition = date.find('.');
+    while (dotPosition != std::string::npos)
+    {
+        date.erase(dotPosition, 1);
+        dotPosition = date.find('.');
+    }
+
+    std::string filename = text2 + date + text1;
+
+    std::ofstream file(filename);
+
+    if (file.is_open())
+    {
+        file << "\n\n\n" << "Firmenname" << std::endl;
+        file << "Strasse 00 " <<  std::endl;
+        file << "O000 Ortschaft " <<  std::endl <<  std::endl;
+
+        file << "Datum: " << _date <<  std::endl <<  std::endl;
+
+        file << "Arbeiter: " << _user <<  std::endl <<  std::endl;
+
+
+        file << std::endl;
+        file << "****************************************" << std::endl << std::endl;
+        file << "Gesamtumsatz: ";
+        file << std::fixed << std::setprecision(2) << sum  << std::endl << std::endl;
+        file << "MwSt%: 20	";
+        file << "Brutto: ";
+        file << std::fixed << std::setprecision(2) << sum20;
+        file << "       Netto: ";
+        file << std::fixed << std::setprecision(2) << sum20 / 1.2;
+        file << "       MwSt: ";
+        file << std::fixed << std::setprecision(2) << sum20 - (sum20 / 1.2)  << std::endl;
+        file << "MwSt%: 10	";
+        file << "Brutto: ";
+        file << std::fixed << std::setprecision(2) << sum10;
+        file << "       Netto: ";
+        file << std::fixed << std::setprecision(2) << sum10 / 1.1;
+        file << "       MwSt: ";
+        file << std::fixed << std::setprecision(2) << sum10 - (sum10 / 1.1)  << std::endl;
+
+        file << std::endl;
+        file << "****************************************" << std::endl << std::endl;
+        file.close();
+
+        std::cout << "File written successfully." << std::endl;
+    } else
+    {
         std::cerr << "Unable to open file." << std::endl;
     }
 
-	}
+    _account.clear();
 
-/***********************************************************************
- * Erstellt eine Rechnung
- * ********************************************************************/
+    _sum = 0.0;
+    displaySum->SetValue(wxString::Format("%.2f", _sum));
+    listView->DeleteAllItems();
+    _accountNumber = database.getAccountNumber();
+    displayNumber->SetValue(wxString::Format("%d", _accountNumber));
 
-	void MainFrame::onButtonInvoice(wxCommandEvent& evt){
-		issueInvoice();
-		database.writeInvoiceToDatabase();
-		database.writeSalesToDatabase();
-		_displayProducts.clear();
-		database.clearAccount();
-		_sum = 0.0;
-		displaySum->SetValue(wxString::Format("%.2f", _sum));
-		listView->DeleteAllItems();
-		database.setAccountNumber();
-		displayAccountNumber->SetValue(wxString::Format("%d", database.getAccountNumber()));
-		Layout();
+    database.deleteAllSalesData();
 
-	}
+    Layout();
+    }
+}
 
-/***********************************************************************
- * Macht den Tagesabschluss
- * ********************************************************************/
-
-	void MainFrame::onButtonClosing(wxCommandEvent& evt){
-
-		double sum = database.getSum();
-		double sum10 = database.getSumTax10();
-		double sum20 = database.getSumTax20();
-		std::cout << std::endl;
-		std::cout << "****************************************" << std::endl << std::endl;
-		std::cout << "Gesamtumsatz: ";
-		std::cout << std::fixed << std::setprecision(2) << sum  << std::endl << std::endl;
-		std::cout << "MwSt%: 20	";
-		std::cout << "Brutto: ";
-		std::cout << std::fixed << std::setprecision(2) << sum20;
-		std::cout << "	Netto: ";
-		std::cout << std::fixed << std::setprecision(2) << calculateTax20(sum20);
-		std::cout << "	MwSt: ";
-		std::cout << std::fixed << std::setprecision(2) << sum20 - calculateTax20(sum20)  << std::endl;
-		std::cout << "MwSt%: 10	";
-		std::cout << "Brutto: ";
-		std::cout << std::fixed << std::setprecision(2) << sum10;
-		std::cout << "	Netto: ";
-		std::cout << std::fixed << std::setprecision(2) << calculateTax10(sum10);
-		std::cout << "	MwSt: ";
-		std::cout << std::fixed << std::setprecision(2) << sum10 - calculateTax10(sum10)  << std::endl;
-
-
-		std::cout << std::endl;
-		std::cout << "****************************************" << std::endl << std::endl;
-// 		_displayProducts.clear();
-// 		database.clearAccount();
-// 		_sum = 0.0;
-// 		displaySum->SetValue(wxString::Format("%.2f", _sum));
-// 		listView->DeleteAllItems();
-// 		database.setAccountNumber();
-// 		displayAccountNumber->SetValue(wxString::Format("%d", database.getAccountNumber()));
-// 		Layout();
-
-	}
-
-	double MainFrame::calculateTax20(double sum){
-
-		double result = sum/1.2;
-
-		return result;
-	}
-
-	double MainFrame::calculateTax10(double sum){
-
-		double result = sum/1.1;
-
-		return result;
-	}

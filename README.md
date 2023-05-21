@@ -1,12 +1,16 @@
-# POS_Project : Registierkasse mit wx-widgets
+# POS_Project : Cash Register with wx-widgets
 
-### Projektbeschreibung
+### Project Description
 
-Erstellen einer GUI für ein einfaches Kassensystem das folgende Funktionen erfüllt:
-- Angemeldeter Benutzer
-- Erstellung einfacher Rechnungen mit Mehrwertsteuer, Rechnungnummer, Datum etc.
-- Speicherung der Rechnungen in Datenbank
-- Eigenverbrauch und Schwund
-- Kassenabschluss
+A simple cash register system with squlite3 database.
+Gets categories and products from the database and creates buttons for each item.
+You can add products to an account, increment and decrement the amount of a product, delete products and clear the current account.
+With the "Cash"-button the products on the current account list are written to the database and a textfile is created as an invoice.
+With the "Closing"-button the daily-closing is done, summing up all sales, calculating the tax and writing the result to a textfile.
 
-![Wireframe](images/Untitled.svg)
+![Wireframe](images/cash.svg)
+
+To compile this project use 
+```
+make
+```

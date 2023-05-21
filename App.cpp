@@ -2,18 +2,17 @@
 #include "MainFrame.hpp"
 #include  "SQLiteDB.hpp"
 
-
 #include <wx/wx.h>
 
-wxIMPLEMENT_APP(App);
-bool App::OnInit() {
+bool App::OnInit()
+{
+    MainFrame *mainframe = new MainFrame("Nadine's CASH REGISTER");
+    mainframe->SetClientSize(1300,800);
+    mainframe->Center();
+    mainframe->SetMinSize(wxSize(1300, 800));
+    mainframe->Show();
 
-
-
-MainFrame* mainFrame = new MainFrame("Rechner");
-mainFrame->SetClientSize(1300, 830); // Define size of the window
-mainFrame->Center();
-mainFrame->Show();
-return true;
-
+    return true;
 }
+
+wxIMPLEMENT_APP(App);

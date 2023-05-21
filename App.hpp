@@ -5,8 +5,10 @@
 //class for the whole App
 class App : public wxApp  // must inherit from wxApp
 {
+
 public:
-bool OnInit(); // Method
+    bool OnInit(); // Method
+
 };
 
 #endif
