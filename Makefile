@@ -4,17 +4,28 @@ WX_LIBS := $(shell $(WX_CONFIG) --libs)
 SQLITE := -lsqlite3
 
 APPLICATION := cashRegister
-OBJECTS := MainFrame.o App.o SQLiteDB.o
+TESTS := taxCalculation_test
+TESTS_OBJECTS := $(addsuffix .o,TESTS)
+APPLICATION_OBJECTS:= MainFrame.o App.o SQLiteDB.o TaxCalculation.o
+OBJECTS := $(APPLICATION_OBJECTS) catch_amalgamated.o
 
-all: $(APPLICATION)
+all: $(APPLICATION) $(TESTS)
 
-$(APPLICATION): $(OBJECTS)
-	$(CXX) -o $@ $(OBJECTS) $(LDFLAGS) $(WX_LIBS) $(LIBS) $(SQLITE)
+$(APPLICATION): $(APPLICATION_OBJECTS)
+	$(CXX) -o $@ $(APPLICATION_OBJECTS) $(LDFLAGS) $(WX_LIBS) $(LIBS) $(SQLITE)
 
-$(OBJECTS): %.o: %.cpp
+$(OBJECTS): %.o: %.cpp %.hpp
 	$(CXX) -c -o $@ $(WX_CXXFLAGS) $(CXXFLAGS) $<
-	
+
+$(TESTS_OBJECTS): %.o: %.cpp
+	$(CXX) -c -o $@ $(WX_CXXFLAGS) $(CXXFLAGS) $<
+
+# missing dependency issue
+taxCalculation_test: taxCalculation_test.o TaxCalculation.o catch_amalgamated.o
+	$(CXX) -o $@ $(LDFLAGS) $^
 
 .PHONY: clean
 clean:
 	find . -name '*~' -o -name '*.o' -o -name $(APPLICATION) | xargs rm
+
+

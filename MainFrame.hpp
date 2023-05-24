@@ -3,6 +3,7 @@
 
 #include "SQLiteDB.hpp"
 #include "Structs.hpp"
+#include "TaxCalculation.hpp"
 
 #include <wx/wx.h>
 #include <wx/listctrl.h>
@@ -17,6 +18,8 @@ class MainFrame : public wxFrame  //MainFrame inherited from wxFrame
 public:
 
     MainFrame(const wxString& title);
+
+    TaxCalculation tax;
 
 
 private:

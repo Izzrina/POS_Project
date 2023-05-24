@@ -39,7 +39,7 @@ MainFrame::MainFrame(const wxString& title) : wxFrame(nullptr, wxID_ANY, title)
 
 
     _accountNumber = database.getAccountNumber();
-    wxString accountNumber = wxString::Format("Rechnungsnummer: %d", _accountNumber);
+    wxString accountNumber = wxString::Format("Account Number: %d", _accountNumber);
 
     displayNumber = new wxTextCtrl( this, wxID_ANY, accountNumber, wxDefaultPosition, wxDefaultSize, 0|wxBORDER_NONE );
     displayNumber->SetFont( wxFont( 12, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD, false, wxT("Sans") ) );
@@ -50,10 +50,10 @@ MainFrame::MainFrame(const wxString& title) : wxFrame(nullptr, wxID_ANY, title)
 
     listView = new wxListView(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLC_REPORT | wxLC_SINGLE_SEL);
     listView->SetFont( wxFont( 14, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, wxT("Sans") ) );
-    listView->InsertColumn(0, "Anzahl");
-    listView->InsertColumn(1, "Produkt");
-    listView->InsertColumn(2, "Preis");
-    listView->InsertColumn(3, "Gesamt");
+    listView->InsertColumn(0, "Amount");
+    listView->InsertColumn(1, "Product");
+    listView->InsertColumn(2, "Price");
+    listView->InsertColumn(3, "Total");
     listView->SetColumnWidth(0, 100);
     listView->SetColumnWidth(1, 200);
     listView->SetColumnWidth(2, 100);
@@ -61,7 +61,7 @@ MainFrame::MainFrame(const wxString& title) : wxFrame(nullptr, wxID_ANY, title)
 
     displaySizer->Add(listView, 5, wxALL | wxEXPAND, 5);
 
-    wxStaticText *text = new wxStaticText( this, wxID_ANY, wxT("Gesamt"), wxDefaultPosition, wxDefaultSize, 0 );
+    wxStaticText *text = new wxStaticText( this, wxID_ANY, wxT("Total"), wxDefaultPosition, wxDefaultSize, 0 );
     text->Wrap( -1 );
     text->SetFont( wxFont( 14, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD, false, wxT("Sans") ) );
     text->SetForegroundColour( wxColour( 240, 240, 240 ) );
@@ -432,8 +432,8 @@ void MainFrame::issueInvoice()
     std::string name = std::to_string(_accountNumber);
     std::string filename = text2 + name + text1;
 
-    double tax20 = 0.0;
-    double tax10 = 0.0;
+    double sum20 = 0.0;
+    double sum10 = 0.0;
     double sum = 0.0;
 
     std::ofstream file(filename);
@@ -457,10 +457,10 @@ void MainFrame::issueInvoice()
             file << std::fixed << std::setprecision(2) << prod.price << "				" << (prod.price * prod.amount) <<std::endl;;
 
             if(prod.tax == 1.2){
-                tax20 += prod.price * prod.amount;
+                sum20 += prod.price * prod.amount;
             }
             if(prod.tax == 1.1){
-                tax10 += prod.price * prod.amount;
+                sum10 += prod.price * prod.amount;
             }
             sum += prod.price * prod.amount;
         }
@@ -468,22 +468,22 @@ void MainFrame::issueInvoice()
         file << "									Gesamt: EUR ";
         file << std::fixed << std::setprecision(2) << sum <<  std::endl <<  std::endl;
 
-        double netto20 = tax20/1.2;
-        double netto10 = tax10/1.1;
+
+
 
         file << "MwSt. 20%:	" << "Netto: ";
-        file << std::fixed << std::setprecision(2) << netto20 ;
+        file << std::fixed << std::setprecision(2) << tax.calculateNet20Percent(sum20) ;
         file << "		MwSt: ";
-        file << std::fixed << std::setprecision(2) << tax20 - netto20 ;
+        file << std::fixed << std::setprecision(2) << tax.calculateTax20Percent(sum20) ;
         file << "	Brutto: ";
-        file << std::fixed << std::setprecision(2) << tax20  << std::endl;
+        file << std::fixed << std::setprecision(2) << sum20  << std::endl;
         file << "MwSt. 10%:	";
         file << "Netto: ";
-        file << std::fixed << std::setprecision(2) << netto10 ;
+        file << std::fixed << std::setprecision(2) << tax.calculateNet10Percent(sum10) ;
         file << "		MwSt: ";
-        file << std::fixed << std::setprecision(2) << tax10 - netto10;
+        file << std::fixed << std::setprecision(2) << tax.calculateTax10Percent(sum10);
         file << "	Brutto: ";
-        file << std::fixed << std::setprecision(2) << tax10 <<std::endl <<std::endl <<std::endl;
+        file << std::fixed << std::setprecision(2) << sum10 <<std::endl <<std::endl <<std::endl;
 
         file << "Vielen Dank"  <<std::endl <<std::endl <<std::endl;
 
@@ -572,16 +572,16 @@ void MainFrame::onButtonClosing(wxCommandEvent& evt)
         file << "Brutto: ";
         file << std::fixed << std::setprecision(2) << sum20;
         file << "       Netto: ";
-        file << std::fixed << std::setprecision(2) << sum20 / 1.2;
+        file << std::fixed << std::setprecision(2) << tax.calculateNet20Percent(sum20);
         file << "       MwSt: ";
-        file << std::fixed << std::setprecision(2) << sum20 - (sum20 / 1.2)  << std::endl;
+        file << std::fixed << std::setprecision(2) << tax.calculateTax20Percent(sum20)  << std::endl;
         file << "MwSt%: 10	";
         file << "Brutto: ";
         file << std::fixed << std::setprecision(2) << sum10;
         file << "       Netto: ";
-        file << std::fixed << std::setprecision(2) << sum10 / 1.1;
+        file << std::fixed << std::setprecision(2) << tax.calculateNet10Percent(sum10);
         file << "       MwSt: ";
-        file << std::fixed << std::setprecision(2) << sum10 - (sum10 / 1.1)  << std::endl;
+        file << std::fixed << std::setprecision(2) << tax.calculateTax10Percent(sum10)  << std::endl;
 
         file << std::endl;
         file << "****************************************" << std::endl << std::endl;
